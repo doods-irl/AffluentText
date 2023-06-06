@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Custom Rich Text Editor</title>
+    <style>
+        body {
+            font-family: "Segoe UI";
+        }
+
+        h1,h2,h3{
+            margin: 0;
+        }
+
+        .h1 {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .h2 {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        #editor {
+            border: 1px solid #000;
+            padding: 10px;
+            min-height: 200px;
+            white-space: pre-wrap;
+        }
+
+        #editor p {
+            margin: 0;
+        }
+
+        #toolbar {
+            display: flex;
+            height: 30px;
+            background-color: #BBB;
+        }
+
+        #toolbar button
+        {
+            height: 30px;
+            width: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <button id="boldButton">B</button>
+        <button id="italicsButton">I</button>
+        <button id="underlineButton">U</button>
+        <button id="strikethroughButton">S</button>
+        <button id="leftAlignButton"><</button>
+        <button id="centerAlignButton">|</button>
+        <button id="rightAlignButton">></button>
+        <button id="insertHeader1Button">H1</button>
+        <button id="insertHeader2Button">H2</button>
+        <button id="revertTextButton">P</button>
+        <select id="fontFaceButton">
+            <option value="Segoe UI">Segoe UI</option>
+            <option value="DM Sans">DM Sans</option>
+            <option value="Cormorant">Cormorant</option>
+            <option value="Montserrat">Montserrat</option>
+        </select>
+    </div>
+    <div id="editor" contenteditable="true"><p>Enter some text here...</p></div>
+
+    <script>
+        function format(command, value) {
+            document.execCommand(command, false, value);
+        }
+
+        document.querySelector('#boldButton').addEventListener('click', function() { format('bold'); });
+        document.querySelector('#italicsButton').addEventListener('click', function() { format('italic'); });
+        document.querySelector('#underlineButton').addEventListener('click', function() { format('underline'); });
+        document.querySelector('#strikethroughButton').addEventListener('click', function() { format('strikeThrough'); });
+        document.querySelector('#leftAlignButton').addEventListener('click', function() { format('justifyLeft'); });
+        document.querySelector('#centerAlignButton').addEventListener('click', function() { format('justifyCenter'); });
+        document.querySelector('#rightAlignButton').addEventListener('click', function() { format('justifyRight'); });
+        document.querySelector('#fontFaceButton').addEventListener('change', function(e) { format('fontName', e.target.value); });
+        var fontFaceButton = document.querySelector('#fontFaceButton');
+        document.addEventListener('selectionchange', function() {
+            var font = window.getSelection().anchorNode.parentNode.style.fontFamily.replace(/"/g, '');
+            fontFaceButton.value = ['Segoe UI', 'DM Sans', 'Cormorant', 'Montserrat'].includes(font) ? font : 'Segoe UI';
+        });
+
+function applyHeader(tagName) {
+    var selection = window.getSelection();
+    console.log(selection);
+    var node = selection.anchorNode;
+
+    // If the selection is collapsed and the node is a text node, use its parent node
+    if (selection.isCollapsed && node.nodeType === Node.TEXT_NODE) {
+        node = node.parentNode;
+    }
+
+    // If the node is not a paragraph or heading, traverse up the DOM tree until a paragraph or heading is found
+    while (node && node.id !== 'editor' && node.nodeName !== 'P' && node.nodeName !== 'H1' && node.nodeName !== 'H2') {
+        node = node.parentNode;
+    }
+
+    // If a suitable node is found, toggle its tag name
+    if (node && node.id !== 'editor') {
+        var newElement;
+
+        // If the current node is already a heading, clear formatting and keep it as a heading
+        if (node.nodeName === 'H1') {
+            newElement = document.createElement(tagName);
+            newElement.innerHTML = node.innerHTML;
+        }
+        else if (node.nodeName === 'H2') {
+            newElement = document.createElement(tagName);
+            newElement.innerHTML = node.innerHTML;
+        }
+        // If the current node is a paragraph, convert it to a heading
+        else if (node.nodeName === 'P') {
+            newElement = document.createElement(tagName);
+            newElement.innerHTML = node.innerHTML;
+        }
+
+        // Replace the old node with the new element
+        node.parentNode.replaceChild(newElement, node);
+
+        // Move the cursor to the end of the new line
+        var range = document.createRange();
+        range.selectNodeContents(newElement);
+        range.collapse(false); // Move cursor to the end
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+}
+
+
+document.querySelector('#insertHeader1Button').addEventListener('click', function() {
+    applyHeader('h1');
+});
+
+document.querySelector('#insertHeader2Button').addEventListener('click', function() {
+    applyHeader('h2');
+});
+
+document.querySelector('#revertTextButton').addEventListener('click', function() {
+    applyHeader('p');
+});
+
+
+        var editor = document.getElementById('editor');
+
+        editor.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                var selection = window.getSelection();
+                var node = selection.anchorNode;
+                var parent = node.parentNode;
+
+                var newNodeTagName = parent.tagName; // Get the tag name of the current line
+                var newNodeClass = parent.className; // Get the class of the current line
+                var newNode;
+
+                if(node.nodeType === Node.TEXT_NODE) {
+                    var text = node.nodeValue;
+
+                    // If the cursor is at the end of the line
+                    if (selection.focusOffset === node.textContent.length) { // Changed from text.length
+                        // If the line is not empty, create a new empty line with p tag
+                        if (text.trim() !== '') {
+                            newNode = document.createElement('p');
+                            newNode.innerHTML = '<br>';
+                            parent.parentNode.insertBefore(newNode, parent.nextSibling);
+                        }
+                        // If the line is empty, create a new empty line with same tag name and remove the current line
+                        else {
+                            parent.innerHTML = '';
+                            newNode = document.createElement(newNodeTagName);
+                            newNode.innerHTML = '<br>';
+                            parent.parentNode.insertBefore(newNode, parent.nextSibling);
+                        }
+                    }
+                    // If the cursor is in the middle of the line, split the line with same tag name
+                    else {
+                        var textBefore = text.slice(0, selection.focusOffset);
+                        var textAfter = text.slice(selection.focusOffset);
+                        var textNodeBefore = document.createTextNode(textBefore);
+                        var textNodeAfter = document.createTextNode(textAfter);
+                        parent.replaceChild(textNodeBefore, node);
+                        newNode = document.createElement(newNodeTagName);
+                        newNode.appendChild(textNodeAfter);
+                        parent.parentNode.insertBefore(newNode, parent.nextSibling);
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) { 
+                    // This handles the case where the cursor is on an empty line.
+                    // Create a new empty line with p tag and insert it after the current line.
+                    newNode = document.createElement('p');
+                    newNode.innerHTML = '<br>';
+                    node.parentNode.insertBefore(newNode, node.nextSibling);
+                }
+
+
+
+                // Move the cursor to the start of the new node
+                var range = document.createRange();
+                range.setStart(newNode, 0);
+                range.setEnd(newNode, 0);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        });
+
+        editor.addEventListener('input', function() {
+            // Get the current focused node
+            var selection = window.getSelection();
+            var node = selection.anchorNode;
+
+            // If the focused node is a text node, use its parent node
+            if (node.nodeType === Node.TEXT_NODE) {
+                node = node.parentNode;
+            }
+
+            // If the node is a paragraph and it contains a <br> tag, remove the <br>
+            if (node.nodeName === 'P' && node.innerHTML.includes('<br>')) {
+                node.innerHTML = node.textContent;
+            }
+        });
+    </script>
+</body>
+</html>
